@@ -423,3 +423,31 @@ The output stores normalized indicator values, source URLs, and short context sn
 ## Legal Disclaimer
 
 For educational and defensive Threat Intelligence purposes only. Use this tool only on systems, services, and data for which you have explicit authorization. The author and contributors are not responsible for misuse, unauthorized access, privacy violations, or unlawful handling of third-party data.
+
+## Field Tools Layer (Defensive Scoped Use)
+
+These four lightweight field tools extend the crawler outputs without turning this repo into a heavy platform.
+
+- `tools/abyssal_mapper.py` builds a simple URL/.onion graph from local HTML, prior crawler JSON, or one scoped URL. Exports JSON + GraphML. Supports `--max-depth`, `--max-pages`, `--same-origin`, and repeated `--allowed-host`.
+- `tools/shadow_fetch.py` downloads only explicit file candidates from `candidates.json` (no recursive crawling). Supports `--proxy`, repeated `--allowed-host`, `--max-files`, `--max-mb`, and `--blocked-ext`. Files are stored by SHA256 filename and metadata is written to `metadata.jsonl` with redacted URLs.
+- `tools/tox_hunter.py` extracts common CTI indicators from local files or crawler JSON using regex and writes JSON + Markdown summaries.
+- `tools/phantom_diff.py` compares two JSON run outputs and reports added, removed, changed, and reappeared items in JSON + Markdown.
+
+### Quick examples
+
+```bash
+python tools/abyssal_mapper.py --html sample.html --output graph.json --graphml graph.graphml --same-origin
+python tools/shadow_fetch.py --input candidates.json --out-dir pulls --allowed-host example.onion --max-files 10 --max-mb 50
+python tools/tox_hunter.py findings.json --output indicators.json --markdown indicators.md
+python tools/phantom_diff.py run_old.json run_new.json --output diff.json --markdown diff.md
+```
+
+### Safe defaults
+
+- Scope-first flags are provided for host and page/file limits.
+- No form submission.
+- No archive auto-extraction.
+- No file execution.
+- Defensive CTI workflow only.
+
+**Important:** use this repository for scoped defensive/CTI analysis with proper authorization only.
