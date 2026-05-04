@@ -27,6 +27,18 @@ Many current leak-site panels are not simple static indexes. Directory navigatio
 │   ├── dumb_crawler.py
 │   ├── intel_harvester.py
 │   └── spa_path_crawler.py
+├── tools/
+│   ├── abyssal_mapper.py
+│   ├── phantom_diff.py
+│   ├── shadow_fetch.py
+│   └── tox_hunter.py
+├── tcv/
+│   ├── common.py
+│   ├── indicators.py
+│   └── redaction.py
+├── tests/
+│   ├── fixtures/
+│   └── test_field_tools.py
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
@@ -299,6 +311,51 @@ Useful `api-crawler` options:
 --file-keys            File array keys
 --name-keys            Filename field keys
 --path-keys            Path or URL field keys
+```
+
+## Field Tools CLI Reference
+
+`abyssal_mapper.py`
+
+```text
+--html             Repeatable local HTML input
+--crawler-json     Crawler JSON input
+--url              Scoped URL seed
+--output           JSON graph output (default abyssal_graph.json)
+--graphml          GraphML output (default abyssal_graph.graphml)
+--max-depth        Crawl depth from URL seed (default 1)
+--max-pages        Crawl page cap from URL seed (default 25)
+--same-origin      Restrict URL crawling to seed origin
+--allowed-host     Repeatable host allow-list
+```
+
+`shadow_fetch.py`
+
+```text
+--input            Candidate JSON input (default candidates.json)
+--out-dir          Download + metadata output directory
+--proxy            Optional proxy URL
+--allowed-host     Repeatable host allow-list
+--max-files        Download cap (default 20)
+--max-mb           Total transfer cap in MB (default 100)
+--blocked-ext      Comma-separated blocked extensions
+```
+
+`tox_hunter.py`
+
+```text
+inputs             One or more local files/JSON exports
+--output           JSON findings output
+--markdown         Markdown summary output
+```
+
+`phantom_diff.py`
+
+```text
+old_json           Baseline JSON run
+new_json           New JSON run
+--output           JSON diff output
+--markdown         Markdown diff summary
 ```
 
 ## Output Format
