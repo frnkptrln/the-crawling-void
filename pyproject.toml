@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["crawlers", "tcv", "tools"]

@@ -1,2 +1,2 @@
-requests
-pysocks
+requests>=2.31,<3
+PySocks>=1.7.1,<2

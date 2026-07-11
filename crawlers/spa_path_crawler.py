@@ -343,7 +343,7 @@ def extract_path_links(html, current_url, root_url, token_param):
     expressions = [
         re.compile(r"""(?is)(?:href|src)\s*=\s*["']([^"']*\?path=[^"']*)["']"""),
         re.compile(r"""(?is)["']([^"']*\?path=[^"']+)["']"""),
-        re.compile(r"""(?is)(\?path=[^"' <>\r\n]+)"""),
+        re.compile(r"""(?is)(?:href|src)\s*=\s*([^\s"'<>]*\?path=[^\s"'<>]*)"""),
     ]
 
     for expression in expressions:
