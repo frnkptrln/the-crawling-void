@@ -1,6 +1,14 @@
 # the-crawling-void
 
+[![CI](https://github.com/frnkptrln/the-crawling-void/actions/workflows/ci.yml/badge.svg)](https://github.com/frnkptrln/the-crawling-void/actions/workflows/ci.yml)
+
 > A small collection of disciplined crawlers for the places where ordinary mirrors lose the trail.
+
+> **Status: defensive alpha.** Parser behavior, scope boundaries, token redaction,
+> snapshot comparison, bounded downloads, and GraphML output are fixture-tested.
+> CI never contacts Tor or live targets. Real-world use still requires an
+> authorized case, reviewed scope, and analyst validation of every generated
+> command and finding.
 
 `the-crawling-void` is an open-source Threat Intelligence and OSINT toolkit for defensive analysis of modern leak-site surfaces, especially Tor hidden services that expose directory listings through single-page application routes such as `?path=/Downloads`.
 
@@ -38,9 +46,13 @@ Many current leak-site panels are not simple static indexes. Directory navigatio
 │   └── redaction.py
 ├── tests/
 │   ├── fixtures/
+│   ├── test_crawlers.py
 │   └── test_field_tools.py
+├── .github/workflows/ci.yml
+├── pyproject.toml
 ├── README.md
 ├── requirements.txt
+├── requirements-dev.txt
 ├── .gitignore
 └── LICENSE
 ```
@@ -62,6 +74,8 @@ Many current leak-site panels are not simple static indexes. Directory navigatio
 - Fast Apache/Nginx open-directory indexing for simple exposed file trees.
 - Structured JSON findings with source route, inferred download URL, and generated `curl`.
 - Token redaction by design: output uses `${TCV_JWT_TOKEN}` placeholders.
+- Fixture-backed tests for all four crawler families and the local field tools.
+- Hard streamed byte caps and redirect scope checks for explicit downloads.
 
 ## Platform Support
 
@@ -71,7 +85,7 @@ Path examples use forward slashes such as `crawlers/spa_path_crawler.py`. Python
 
 ## Prerequisites
 
-- Python 3.9 or newer.
+- Python 3.10 or newer.
 - Tor Browser or a Tor service exposing a local SOCKS proxy.
 - Authorization to access the target service and analyze the listed material.
 
@@ -325,7 +339,9 @@ Useful `api-crawler` options:
 --graphml          GraphML output (default abyssal_graph.graphml)
 --max-depth        Crawl depth from URL seed (default 1)
 --max-pages        Crawl page cap from URL seed (default 25)
---same-origin      Restrict URL crawling to seed origin
+--max-bytes        Per-page response cap (default 2 MiB)
+--same-origin      Compatibility flag; same-origin crawling is now the default
+--include-external Explicitly allow off-origin crawl requests
 --allowed-host     Repeatable host allow-list
 ```
 
@@ -335,7 +351,8 @@ Useful `api-crawler` options:
 --input            Candidate JSON input (default candidates.json)
 --out-dir          Download + metadata output directory
 --proxy            Optional proxy URL
---allowed-host     Repeatable host allow-list
+--allowed-host     Repeatable host allow-list (required by default)
+--allow-any-host   Explicitly opt out of host scoping
 --max-files        Download cap (default 20)
 --max-mb           Total transfer cap in MB (default 100)
 --blocked-ext      Comma-separated blocked extensions
@@ -357,6 +374,24 @@ new_json           New JSON run
 --output           JSON diff output
 --markdown         Markdown diff summary
 ```
+
+`phantom-diff` reports added, removed, changed, and unchanged records using a
+stable record identity. It intentionally does **not** infer “reappeared” from
+only two snapshots; that claim requires lifecycle-aware history.
+
+## Validation
+
+The test suite uses local fixtures and mocks only:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m compileall -q crawlers tcv tools tests
+python -m pytest -q
+```
+
+CI runs the same checks on Python 3.10 and 3.12. Passing CI demonstrates parser
+and boundary behavior against committed fixtures, not compatibility with an
+arbitrary live panel.
 
 ## Output Format
 
@@ -485,15 +520,15 @@ For educational and defensive Threat Intelligence purposes only. Use this tool o
 
 These four lightweight field tools extend the crawler outputs without turning this repo into a heavy platform.
 
-- `tools/abyssal_mapper.py` builds a simple URL/.onion graph from local HTML, prior crawler JSON, or one scoped URL. Exports JSON + GraphML. Supports `--max-depth`, `--max-pages`, `--same-origin`, and repeated `--allowed-host`.
-- `tools/shadow_fetch.py` downloads only explicit file candidates from `candidates.json` (no recursive crawling). Supports `--proxy`, repeated `--allowed-host`, `--max-files`, `--max-mb`, and `--blocked-ext`. Files are stored by SHA256 filename and metadata is written to `metadata.jsonl` with redacted URLs.
+- `tools/abyssal_mapper.py` builds a bounded URL/.onion graph from local HTML, prior crawler JSON, or one scoped URL. Live crawling is same-origin by default, response-bounded, and exports XML-safe JSON + GraphML.
+- `tools/shadow_fetch.py` downloads only explicit file candidates from `candidates.json` (no recursive crawling). Host scoping is required unless `--allow-any-host` is supplied explicitly; redirects are rechecked, transfers are streamed under a hard total byte cap, and metadata URLs are redacted.
 - `tools/tox_hunter.py` extracts common CTI indicators from local files or crawler JSON using regex and writes JSON + Markdown summaries.
-- `tools/phantom_diff.py` compares two JSON run outputs and reports added, removed, changed, and reappeared items in JSON + Markdown.
+- `tools/phantom_diff.py` compares two JSON run outputs by stable identity and reports added, removed, changed, and unchanged records in JSON + Markdown.
 
 ### Quick examples
 
 ```bash
-python tools/abyssal_mapper.py --html sample.html --output graph.json --graphml graph.graphml --same-origin
+python tools/abyssal_mapper.py --html sample.html --output graph.json --graphml graph.graphml
 python tools/shadow_fetch.py --input candidates.json --out-dir pulls --allowed-host example.onion --max-files 10 --max-mb 50
 python tools/tox_hunter.py findings.json --output indicators.json --markdown indicators.md
 python tools/phantom_diff.py run_old.json run_new.json --output diff.json --markdown diff.md

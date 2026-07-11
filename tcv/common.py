@@ -1,6 +1,6 @@
 import datetime as _dt
-import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -14,8 +14,10 @@ def read_json(path: str | Path) -> Any:
 
 
 def write_json(path: str | Path, data: Any) -> None:
-    Path(path).write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
-
-
-def sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+    destination = Path(path)
+    temporary = destination.with_name(destination.name + ".tmp")
+    temporary.write_text(
+        json.dumps(data, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    os.replace(temporary, destination)

@@ -19,4 +19,13 @@ def redact_url(url: str) -> str:
 
 
 def redact_text(text: str) -> str:
-    return re.sub(r"(?i)(token|apikey|authorization)=([^&\s]+)", r"\1=[REDACTED]", text)
+    redacted = re.sub(
+        r"(?i)(token|apikey|authorization|jwt|session)=([^&;\s]+)",
+        r"\1=[REDACTED]",
+        text,
+    )
+    return re.sub(
+        r"(?i)(authorization\s*:\s*bearer\s+)([^\s,;]+)",
+        r"\1[REDACTED]",
+        redacted,
+    )
