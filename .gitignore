@@ -28,3 +28,15 @@ secrets.*
 .agents/
 .codex
 .codex/
+
+# Private keys and credential stores
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+.netrc
+.pypirc
