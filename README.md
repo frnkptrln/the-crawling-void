@@ -343,6 +343,8 @@ Useful `api-crawler` options:
 --same-origin      Compatibility flag; same-origin crawling is now the default
 --include-external Explicitly allow off-origin crawl requests
 --allowed-host     Repeatable host allow-list
+--proxy            Proxy for the URL seed (default socks5h://localhost:9050)
+--direct           Crawl the URL seed without a proxy (explicit opt-out)
 ```
 
 `shadow_fetch.py`
@@ -350,7 +352,8 @@ Useful `api-crawler` options:
 ```text
 --input            Candidate JSON input (default candidates.json)
 --out-dir          Download + metadata output directory
---proxy            Optional proxy URL
+--proxy            Proxy URL or host:port (default socks5h://localhost:9050)
+--direct           Download without a proxy (explicit opt-out)
 --allowed-host     Repeatable host allow-list (required by default)
 --allow-any-host   Explicitly opt out of host scoping
 --max-files        Download cap (default 20)
@@ -520,8 +523,8 @@ For educational and defensive Threat Intelligence purposes only. Use this tool o
 
 These four lightweight field tools extend the crawler outputs without turning this repo into a heavy platform.
 
-- `tools/abyssal_mapper.py` builds a bounded URL/.onion graph from local HTML, prior crawler JSON, or one scoped URL. Live crawling is same-origin by default, response-bounded, and exports XML-safe JSON + GraphML.
-- `tools/shadow_fetch.py` downloads only explicit file candidates from `candidates.json` (no recursive crawling). Host scoping is required unless `--allow-any-host` is supplied explicitly; redirects are rechecked, transfers are streamed under a hard total byte cap, and metadata URLs are redacted.
+- `tools/abyssal_mapper.py` builds a bounded URL/.onion graph from local HTML, prior crawler JSON, or one scoped URL. Live crawling goes through Tor and is same-origin by default, response-bounded, and exports XML-safe JSON + GraphML.
+- `tools/shadow_fetch.py` downloads only explicit file candidates from `candidates.json` (no recursive crawling), through Tor by default. Host scoping is required unless `--allow-any-host` is supplied explicitly; redirects are rechecked, transfers are streamed under a hard total byte cap, and metadata URLs are redacted.
 - `tools/tox_hunter.py` extracts common CTI indicators from local files or crawler JSON using regex and writes JSON + Markdown summaries.
 - `tools/phantom_diff.py` compares two JSON run outputs by stable identity and reports added, removed, changed, and unchanged records in JSON + Markdown.
 
@@ -537,6 +540,7 @@ python tools/phantom_diff.py run_old.json run_new.json --output diff.json --mark
 ### Safe defaults
 
 - Scope-first flags are provided for host and page/file limits.
+- Live requests go through Tor (`socks5h://localhost:9050`, names resolved by Tor) like the crawlers. `socks4://` and `socks5://` are refused because they resolve names on the analyst's machine, an empty `--proxy` is an error, and only `--direct` connects without a proxy. A proxied session ignores `HTTP(S)_PROXY`, `NO_PROXY` and `.netrc`.
 - No form submission.
 - No archive auto-extraction.
 - No file execution.
