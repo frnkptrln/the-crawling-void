@@ -12,6 +12,7 @@ from urllib.parse import unquote, urljoin, urlparse
 import requests
 
 from tcv.common import utc_timestamp
+from tcv.network import add_network_arguments, session_from_args
 from tcv.redaction import redact_text, redact_url
 
 
@@ -158,7 +159,6 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", default="candidates.json")
     parser.add_argument("--out-dir", default="downloads")
-    parser.add_argument("--proxy", default="")
     parser.add_argument("--allowed-host", action="append", default=[])
     parser.add_argument(
         "--allow-any-host",
@@ -168,6 +168,7 @@ def main():
     parser.add_argument("--max-files", type=int, default=20)
     parser.add_argument("--max-mb", type=float, default=100)
     parser.add_argument("--blocked-ext", default=".exe,.dll,.js")
+    add_network_arguments(parser)
     args = parser.parse_args()
 
     allowed_hosts = normalized_hosts(args.allowed_host)
@@ -175,15 +176,14 @@ def main():
         parser.error("provide --allowed-host at least once, or explicitly use --allow-any-host")
     if args.max_files < 1 or args.max_mb <= 0:
         parser.error("--max-files and --max-mb must be positive")
+    # Settle how requests leave this machine before anything touches the disk.
+    session = session_from_args(parser, args)
 
     blocked = {extension.strip().lower() for extension in args.blocked_ext.split(",") if extension.strip()}
     budget = int(args.max_mb * 1024 * 1024)
     output_dir = Path(args.out_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     metadata_path = output_dir / "metadata.jsonl"
-    session = requests.Session()
-    if args.proxy:
-        session.proxies.update({"http": args.proxy, "https": args.proxy})
 
     try:
         candidates = load_candidates(args.input)

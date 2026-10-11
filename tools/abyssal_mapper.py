@@ -13,6 +13,7 @@ from pathlib import Path
 import requests
 
 from tcv.common import write_json
+from tcv.network import add_network_arguments, session_from_args
 from tcv.redaction import redact_text, redact_url
 
 
@@ -102,6 +103,7 @@ def main():
     parser.add_argument("--same-origin", action="store_true", help="Retained for compatibility; now the default.")
     parser.add_argument("--include-external", action="store_true", help="Allow off-origin crawl requests.")
     parser.add_argument("--allowed-host", action="append", default=[])
+    add_network_arguments(parser)
     args = parser.parse_args()
 
     nodes, edges, queue, seen = set(), set(), deque(), set()
@@ -122,7 +124,8 @@ def main():
 
     root_host = normalized_host(args.url) if args.url else ""
     allowed_hosts = {value.lower().rstrip(".") for value in args.allowed_host}
-    session = requests.Session()
+    # Only a URL seed goes to the network; local inputs never need a session.
+    session = session_from_args(parser, args) if args.url else None
     pages = 0
     while queue and pages < args.max_pages:
         url, depth, parent = queue.popleft()
