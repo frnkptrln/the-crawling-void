@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from tools.abyssal_mapper import export_graphml
+from tools.abyssal_mapper import export_graphml, extract_urls
 from tools.phantom_diff import compare_snapshots
 from tools.shadow_fetch import candidate_status, download_candidate
 
@@ -57,6 +57,51 @@ def test_abyssal_mapper_html(tmp_path):
     run(["python", "tools/abyssal_mapper.py", "--html", "tests/fixtures/sample.html", "--output", str(output), "--graphml", str(graphml)])
     data = json.loads(output.read_text())
     assert "http://example.com/a" in data["nodes"]
+
+
+@pytest.mark.parametrize("entity", ["&amp;", "&#38;", "&#x26;"])
+@pytest.mark.parametrize("quote", ["'", '"'])
+@pytest.mark.parametrize("scheme", ["https", "HTTPS"])
+def test_abyssal_mapper_decodes_href_entities_once(entity, quote, scheme):
+    encoded = f"{scheme}://example.test/?a=1{entity}b=2"
+    text = f"<a href={quote}{encoded}{quote}>link</a>"
+    urls, onions = extract_urls(text)
+    assert urls == [f"{scheme}://example.test/?a=1&b=2"]
+    assert onions == []
+
+
+def test_abyssal_mapper_preserves_entities_outside_href():
+    raw_url = "https://example.test/?a=1&amp;b=2"
+    text = f'<script>const url = "{raw_url}";</script>'
+    text += f'<p>{raw_url}</p><a href="{raw_url}">link</a>'
+    urls, _ = extract_urls(text)
+    assert urls == ["https://example.test/?a=1&amp;b=2", "https://example.test/?a=1&b=2"]
+
+
+@pytest.mark.parametrize("template", [
+    '<script>const href = "{url}";</script>',
+    '<script>const markup = \'<a href="{url}">\';</script>',
+    '<!-- href="{url}" -->',
+    '<!-- <a href="{url}">link</a> -->',
+    '<a data-href="{url}">link</a>',
+    '<a title=\'href="{url}"\'>link</a>',
+])
+def test_abyssal_mapper_does_not_decode_href_text_outside_attributes(template):
+    raw_url = "https://example.test/?a=1&amp;b=2"
+    urls, _ = extract_urls(template.format(url=raw_url))
+    assert urls == [raw_url]
+
+
+def test_abyssal_mapper_html_entities_do_not_duplicate_graph_nodes(tmp_path):
+    source = tmp_path / "links.html"
+    source.write_text('<a href="https://example.test/?a=1&amp;b=2">link</a>')
+    output = tmp_path / "graph.json"
+    graphml = tmp_path / "graph.graphml"
+    run(["python", "tools/abyssal_mapper.py", "--html", str(source), "--output", str(output), "--graphml", str(graphml)])
+    assert json.loads(output.read_text())["nodes"] == ["https://example.test/?a=1&b=2"]
+    namespace = {"g": "http://graphml.graphdrawing.org/xmlns"}
+    labels = [node.text for node in ET.parse(graphml).findall(".//g:data", namespace)]
+    assert labels == ["https://example.test/?a=1&b=2"]
 
 
 def test_graphml_escapes_urls_and_uses_safe_node_ids(tmp_path):
