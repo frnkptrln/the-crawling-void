@@ -26,6 +26,36 @@ Many current leak-site panels are not simple static indexes. Directory navigatio
 
 `spa-path-crawler` performs breadth-first traversal of same-origin `?path=` routes. It records file-looking routes as candidate downloads but avoids fetching them as pages. Tokens are never written into JSON output; generated commands reference `${TCV_JWT_TOKEN}` instead.
 
+## Scope and authorisation
+
+`the-crawling-void` is for mandated incident-response (IR) and cyber threat
+intelligence (CTI) work. Use it only for analysis carried out for, or with the
+authorisation of, the organisation affected by the material under examination,
+or a competent authority acting on its behalf. A criminal leak site has no
+operator who can grant that permission: the mandate comes from the affected
+organisation or the authority, never from the place the data happens to sit.
+
+The tooling cannot verify any of this. It does not know who you are, which case
+you are on, or whether anyone authorised the collection, and a passing test run
+is not a permission. Authorisation lives with the operator, and so does
+responsibility for every request made and every file retrieved.
+
+The author built these tools in the course of professional defensive security
+practice. That is the context the framing comes from; it is not a claim that
+any particular past or future use is lawful.
+
+### Data handling and § 202d StGB
+
+Material on leak sites routinely contains third-party personal data, so
+retrieving or analysing it engages data-protection law (in the EU and Germany,
+the GDPR and the BDSG) and, under German law, § 202d StGB (Datenhehlerei), which
+can apply to handling data that was obtained through someone else's unlawful
+act. This is a scope limit, not legal advice: use the tools only where you have
+a lawful basis and a genuine defensive purpose, keep retrieved material to the
+minimum the case needs, and handle it accordingly. Establishing the legal basis
+that applies in your jurisdiction is your responsibility, before anything is run
+against live data.
+
 ## Repository Layout
 
 ```text
