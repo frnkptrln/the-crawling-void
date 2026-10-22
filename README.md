@@ -264,7 +264,8 @@ curl -L --fail --silent --show-error --compressed --socks5-hostname 'localhost:9
 -t, --token           JWT session token
 -w, --wordlist        Local indicator or regex file
 -o, --output          JSON output path
--p, --proxy           Proxy URL or host:port
+--proxy               Proxy URL or host:port (default socks5h://localhost:9050, Tor with remote DNS)
+--direct              Connect without a proxy (targets see your address)
 -d, --delay           Delay between requests
 --auth-mode           header, query, or both
 --token-param         Query parameter name, default token
@@ -570,7 +571,7 @@ python tools/phantom_diff.py run_old.json run_new.json --output diff.json --mark
 ### Safe defaults
 
 - Scope-first flags are provided for host and page/file limits.
-- Live requests go through Tor (`socks5h://localhost:9050`, names resolved by Tor) like the crawlers. `socks4://` and `socks5://` are refused because they resolve names on the analyst's machine, an empty `--proxy` is an error, and only `--direct` connects without a proxy. A proxied session ignores `HTTP(S)_PROXY`, `NO_PROXY` and `.netrc`.
+- Live requests go through Tor (`socks5h://localhost:9050`, names resolved by Tor). The crawlers and the field tools build their sessions the same way, through `tcv/network.py`: `socks4://` and `socks5://` are refused because they resolve names on the analyst's machine, an empty `--proxy` is an error rather than a silent direct connection, and only `--direct` connects without a proxy. A proxied session ignores `HTTP(S)_PROXY`, `NO_PROXY` and `.netrc`.
 - No form submission.
 - No archive auto-extraction.
 - No file execution.
