@@ -73,12 +73,16 @@ against live data.
 ├── tcv/
 │   ├── common.py
 │   ├── indicators.py
+│   ├── network.py
 │   └── redaction.py
 ├── tests/
 │   ├── fixtures/
+│   ├── test_crawler_network.py
 │   ├── test_crawlers.py
-│   └── test_field_tools.py
+│   ├── test_field_tools.py
+│   └── test_network.py
 ├── .github/workflows/ci.yml
+├── AGENTS.md
 ├── pyproject.toml
 ├── README.md
 ├── requirements.txt
@@ -562,10 +566,10 @@ These four lightweight field tools extend the crawler outputs without turning th
 ### Quick examples
 
 ```bash
-python tools/abyssal_mapper.py --html sample.html --output graph.json --graphml graph.graphml
-python tools/shadow_fetch.py --input candidates.json --out-dir pulls --allowed-host example.onion --max-files 10 --max-mb 50
-python tools/tox_hunter.py findings.json --output indicators.json --markdown indicators.md
-python tools/phantom_diff.py run_old.json run_new.json --output diff.json --markdown diff.md
+python -m tools.abyssal_mapper --html sample.html --output graph.json --graphml graph.graphml
+python -m tools.shadow_fetch --input candidates.json --out-dir pulls --allowed-host example.onion --max-files 10 --max-mb 50
+python -m tools.tox_hunter findings.json --output indicators.json --markdown indicators.md
+python -m tools.phantom_diff run_old.json run_new.json --output diff.json --markdown diff.md
 ```
 
 ### Safe defaults
