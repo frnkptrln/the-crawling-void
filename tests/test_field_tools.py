@@ -1,5 +1,6 @@
 import json
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -16,7 +17,7 @@ def run(cmd):
 def test_tox_hunter(tmp_path):
     out = tmp_path / "o.json"
     md = tmp_path / "o.md"
-    run(["python", "tools/tox_hunter.py", "tests/fixtures/sample.html", "--output", str(out), "--markdown", str(md)])
+    run([sys.executable, "tools/tox_hunter.py", "tests/fixtures/sample.html", "--output", str(out), "--markdown", str(md)])
     data = json.loads(out.read_text())
     assert "analyst@example.org" in data["email"]
     assert any(value.endswith(".onion") for value in data["onion"])
@@ -28,7 +29,7 @@ def test_phantom_diff(tmp_path):
     old.write_text(json.dumps({"urls": ["a", "b"]}))
     new.write_text(json.dumps({"urls": ["b", "c"]}))
     output = tmp_path / "diff.json"
-    run(["python", "tools/phantom_diff.py", str(old), str(new), "--output", str(output)])
+    run([sys.executable, "tools/phantom_diff.py", str(old), str(new), "--output", str(output)])
     diff = json.loads(output.read_text())
     assert diff["added"] == ["c"]
     assert diff["removed"] == ["a"]
@@ -54,7 +55,7 @@ def test_phantom_diff_rejects_duplicate_identities():
 def test_abyssal_mapper_html(tmp_path):
     output = tmp_path / "graph.json"
     graphml = tmp_path / "graph.graphml"
-    run(["python", "tools/abyssal_mapper.py", "--html", "tests/fixtures/sample.html", "--output", str(output), "--graphml", str(graphml)])
+    run([sys.executable, "tools/abyssal_mapper.py", "--html", "tests/fixtures/sample.html", "--output", str(output), "--graphml", str(graphml)])
     data = json.loads(output.read_text())
     assert "http://example.com/a" in data["nodes"]
 

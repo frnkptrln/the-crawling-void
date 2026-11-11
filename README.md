@@ -26,6 +26,36 @@ Many current leak-site panels are not simple static indexes. Directory navigatio
 
 `spa-path-crawler` performs breadth-first traversal of same-origin `?path=` routes. It records file-looking routes as candidate downloads but avoids fetching them as pages. Tokens are never written into JSON output; generated commands reference `${TCV_JWT_TOKEN}` instead.
 
+## Scope and authorisation
+
+`the-crawling-void` is for mandated incident-response (IR) and cyber threat
+intelligence (CTI) work. Use it only for analysis carried out for, or with the
+authorisation of, the organisation affected by the material under examination,
+or a competent authority acting on its behalf. A criminal leak site has no
+operator who can grant that permission: the mandate comes from the affected
+organisation or the authority, never from the place the data happens to sit.
+
+The tooling cannot verify any of this. It does not know who you are, which case
+you are on, or whether anyone authorised the collection, and a passing test run
+is not a permission. Authorisation lives with the operator, and so does
+responsibility for every request made and every file retrieved.
+
+The author built these tools in the course of professional defensive security
+practice. That is the context the framing comes from; it is not a claim that
+any particular past or future use is lawful.
+
+### Data handling and § 202d StGB
+
+Material on leak sites routinely contains third-party personal data, so
+retrieving or analysing it engages data-protection law (in the EU and Germany,
+the GDPR and the BDSG) and, under German law, § 202d StGB (Datenhehlerei), which
+can apply to handling data that was obtained through someone else's unlawful
+act. This is a scope limit, not legal advice: use the tools only where you have
+a lawful basis and a genuine defensive purpose, keep retrieved material to the
+minimum the case needs, and handle it accordingly. Establishing the legal basis
+that applies in your jurisdiction is your responsibility, before anything is run
+against live data.
+
 ## Repository Layout
 
 ```text
@@ -43,12 +73,16 @@ Many current leak-site panels are not simple static indexes. Directory navigatio
 ├── tcv/
 │   ├── common.py
 │   ├── indicators.py
+│   ├── network.py
 │   └── redaction.py
 ├── tests/
 │   ├── fixtures/
+│   ├── test_crawler_network.py
 │   ├── test_crawlers.py
-│   └── test_field_tools.py
+│   ├── test_field_tools.py
+│   └── test_network.py
 ├── .github/workflows/ci.yml
+├── AGENTS.md
 ├── pyproject.toml
 ├── README.md
 ├── requirements.txt
@@ -234,7 +268,8 @@ curl -L --fail --silent --show-error --compressed --socks5-hostname 'localhost:9
 -t, --token           JWT session token
 -w, --wordlist        Local indicator or regex file
 -o, --output          JSON output path
--p, --proxy           Proxy URL or host:port
+--proxy               Proxy URL or host:port (default socks5h://localhost:9050, Tor with remote DNS)
+--direct              Connect without a proxy (targets see your address)
 -d, --delay           Delay between requests
 --auth-mode           header, query, or both
 --token-param         Query parameter name, default token
@@ -531,16 +566,16 @@ These four lightweight field tools extend the crawler outputs without turning th
 ### Quick examples
 
 ```bash
-python tools/abyssal_mapper.py --html sample.html --output graph.json --graphml graph.graphml
-python tools/shadow_fetch.py --input candidates.json --out-dir pulls --allowed-host example.onion --max-files 10 --max-mb 50
-python tools/tox_hunter.py findings.json --output indicators.json --markdown indicators.md
-python tools/phantom_diff.py run_old.json run_new.json --output diff.json --markdown diff.md
+python -m tools.abyssal_mapper --html sample.html --output graph.json --graphml graph.graphml
+python -m tools.shadow_fetch --input candidates.json --out-dir pulls --allowed-host example.onion --max-files 10 --max-mb 50
+python -m tools.tox_hunter findings.json --output indicators.json --markdown indicators.md
+python -m tools.phantom_diff run_old.json run_new.json --output diff.json --markdown diff.md
 ```
 
 ### Safe defaults
 
 - Scope-first flags are provided for host and page/file limits.
-- Live requests go through Tor (`socks5h://localhost:9050`, names resolved by Tor) like the crawlers. `socks4://` and `socks5://` are refused because they resolve names on the analyst's machine, an empty `--proxy` is an error, and only `--direct` connects without a proxy. A proxied session ignores `HTTP(S)_PROXY`, `NO_PROXY` and `.netrc`.
+- Live requests go through Tor (`socks5h://localhost:9050`, names resolved by Tor). The crawlers and the field tools build their sessions the same way, through `tcv/network.py`: `socks4://` and `socks5://` are refused because they resolve names on the analyst's machine, an empty `--proxy` is an error rather than a silent direct connection, and only `--direct` connects without a proxy. A proxied session ignores `HTTP(S)_PROXY`, `NO_PROXY` and `.netrc`.
 - No form submission.
 - No archive auto-extraction.
 - No file execution.
