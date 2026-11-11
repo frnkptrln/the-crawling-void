@@ -8,6 +8,7 @@ import re
 import urllib.parse
 import xml.etree.ElementTree as ET
 from collections import deque
+from html.parser import HTMLParser
 from pathlib import Path
 
 import requests
@@ -19,7 +20,9 @@ from tcv.redaction import redact_text, redact_url
 
 URL_RE = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
 ONION_RE = re.compile(r"\b[a-z2-7]{16,56}\.onion\b", re.IGNORECASE)
-HREF_RE = re.compile(r"(?is)\bhref\s*=\s*[\"']([^\"']+)")
+ATTRIBUTE_RE = re.compile(
+    r'''\s+([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?'''
+)
 GRAPHML_NS = "http://graphml.graphdrawing.org/xmlns"
 DEFAULT_MAX_BYTES = 2 * 1024 * 1024
 
@@ -34,14 +37,43 @@ def host_allowed(url, allowed_hosts):
     return normalized_host(url) in allowed_hosts
 
 
+class HrefParser(HTMLParser):
+    def __init__(self, text):
+        super().__init__(convert_charrefs=False)
+        self.line_starts = [0] + [match.end() for match in re.finditer("\n", text)]
+        self.href_spans = []
+
+    def handle_starttag(self, tag, attrs):
+        line, column = self.getpos()
+        start = self.line_starts[line - 1] + column
+        # Tokenize whole attributes so data-href and href= inside another
+        # attribute's quoted value are not mistaken for href attributes.
+        for match in ATTRIBUTE_RE.finditer(self.get_starttag_text()):
+            if match.group(1).lower() != "href":
+                continue
+            value = next((value for value in match.groups()[1:] if value is not None), None)
+            if value is not None:
+                self.href_spans.append((start + match.start(), start + match.end(), value))
+
+
 def extract_urls(text, base_url=""):
-    found = set(URL_RE.findall(text))
-    for match in HREF_RE.finditer(text):
-        link = html.unescape(match.group(1).strip())
+    parser = HrefParser(text)
+    parser.feed(text)
+    parser.close()
+    raw_parts, cursor = [], 0
+    for start, end, _ in parser.href_spans:
+        raw_parts.append(text[cursor:start])
+        cursor = end
+    raw_parts.append(text[cursor:])
+    # Only actual href attributes are decoded. Raw text, scripts and comments
+    # retain their spelling, even when they contain an assignment named href.
+    found = set(URL_RE.findall(" ".join(raw_parts)))
+    for _, _, value in parser.href_spans:
+        link = html.unescape(value.strip())
         if link.startswith(("mailto:", "javascript:", "#", "tel:", "data:")):
             continue
         absolute = urllib.parse.urljoin(base_url, link)
-        if absolute.startswith(("http://", "https://")):
+        if absolute.lower().startswith(("http://", "https://")):
             found.add(absolute)
     return sorted(found), sorted(set(ONION_RE.findall(text)))
 
