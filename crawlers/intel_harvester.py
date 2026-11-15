@@ -11,16 +11,25 @@ for tracking infrastructure and negotiation channels.
 import argparse
 import html
 import json
+import os
 import re
+import sys
 import time
 import urllib.parse
 
 import requests
 
+# Allow running as a loose script (python crawlers/intel_harvester.py) as well
+# as a module (python -m crawlers.intel_harvester): put the repository root on
+# the path so the shared, hardened tcv.network import resolves either way.
+if __package__ in (None, ""):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from tcv import network
+
 
 REPOSITORY = "the-crawling-void"
 TOOL_NAME = "intel-harvester"
-DEFAULT_PROXY = "socks5h://localhost:9050"
 REQUEST_TIMEOUT = 60
 DEFAULT_MAX_BYTES = 2 * 1024 * 1024
 
@@ -55,19 +64,13 @@ PGP_PUBLIC_KEY_RE = re.compile(
 HREF_RE = re.compile(r"""(?is)\bhref\s*=\s*["']([^"']+)["']""")
 
 
-def parse_args():
+def build_parser():
     parser = argparse.ArgumentParser(
         prog=TOOL_NAME,
         description="Harvest actor-side CTI indicators from blogs, forums, and leak-site posts.",
     )
     parser.add_argument("-u", "--url", required=True, help="Start URL to harvest.")
     parser.add_argument("-o", "--output", required=True, help="JSON output file.")
-    parser.add_argument(
-        "-p",
-        "--proxy",
-        default=DEFAULT_PROXY,
-        help=f"Proxy URL or host:port. Default: {DEFAULT_PROXY}",
-    )
     parser.add_argument(
         "-d",
         "--delay",
@@ -110,15 +113,8 @@ def parse_args():
         default=20000,
         help="Maximum stored indicator value length. Long PGP blocks may be truncated. Default: 20000",
     )
-    return parser.parse_args()
-
-
-def normalize_proxy(proxy):
-    if not proxy:
-        return ""
-    if "://" not in proxy:
-        return "socks5h://" + proxy
-    return proxy
+    network.add_network_arguments(parser)
+    return parser
 
 
 def normalize_url(url):
@@ -135,8 +131,11 @@ def same_origin(left_url, right_url):
     return left.scheme == right.scheme and left.netloc == right.netloc
 
 
-def create_session(proxy):
-    session = requests.Session()
+def build_session(parser, args):
+    # The session is built by tcv.network so the crawler shares the field tools'
+    # Tor discipline: remote-DNS SOCKS by default, trust_env off, and no silent
+    # direct connection. Only the request headers are crawler-local.
+    session = network.session_from_args(parser, args)
     session.headers.update(
         {
             "User-Agent": TOR_BROWSER_USER_AGENTS[0],
@@ -148,8 +147,6 @@ def create_session(proxy):
             "Upgrade-Insecure-Requests": "1",
         }
     )
-    if proxy:
-        session.proxies.update({"http": proxy, "https": proxy})
     return session
 
 
@@ -428,10 +425,9 @@ def print_indicator(indicator):
     print("    source: {0}".format(indicator["source_url"]))
 
 
-def crawl(args):
+def crawl(args, session):
     start_url = normalize_url(args.url)
-    proxy = normalize_proxy(args.proxy)
-    session = create_session(proxy)
+    proxy = session.proxies.get("https", "")
 
     queue = [(start_url, 0)]
     visited = set()
@@ -502,8 +498,10 @@ def write_json(path, data):
 
 
 def main():
-    args = parse_args()
-    result = crawl(args)
+    parser = build_parser()
+    args = parser.parse_args()
+    session = build_session(parser, args)
+    result = crawl(args, session)
     write_json(args.output, result)
     print("[*] JSON written: {0}".format(args.output))
     print("[*] Pages harvested: {0}".format(result["pages_harvested"]))

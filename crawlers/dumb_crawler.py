@@ -11,16 +11,25 @@ follow-up.
 import argparse
 import html
 import json
+import os
 import re
+import sys
 import time
 import urllib.parse
 
 import requests
 
+# Allow running as a loose script (python crawlers/dumb_crawler.py) as well as a
+# module (python -m crawlers.dumb_crawler): put the repository root on the path
+# so the shared, hardened tcv.network import resolves either way.
+if __package__ in (None, ""):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from tcv import network
+
 
 REPOSITORY = "the-crawling-void"
 TOOL_NAME = "dumb-crawler"
-DEFAULT_PROXY = "socks5h://localhost:9050"
 REQUEST_TIMEOUT = 60
 DEFAULT_MAX_BYTES = 2 * 1024 * 1024
 
@@ -39,19 +48,13 @@ DATE_RE = re.compile(r"\b\d{2,4}[-/][A-Za-z0-9]{2,3}[-/]\d{2,4}(?:\s+\d{2}:\d{2}
 SIZE_RE = re.compile(r"\b(?:\d+(?:\.\d+)?\s?(?:B|K|M|G|T|P)?|[-])\b", re.IGNORECASE)
 
 
-def parse_args():
+def build_parser():
     parser = argparse.ArgumentParser(
         prog=TOOL_NAME,
         description="Fast indexer for plain Apache and Nginx open directories.",
     )
     parser.add_argument("-u", "--url", required=True, help="Open directory URL to index.")
     parser.add_argument("-o", "--output", required=True, help="JSON output file.")
-    parser.add_argument(
-        "-p",
-        "--proxy",
-        default=DEFAULT_PROXY,
-        help=f"Proxy URL or host:port. Default: {DEFAULT_PROXY}",
-    )
     parser.add_argument(
         "-d",
         "--delay",
@@ -97,15 +100,8 @@ def parse_args():
         action="store_true",
         help="Do not generate curl commands for file entries.",
     )
-    return parser.parse_args()
-
-
-def normalize_proxy(proxy):
-    if not proxy:
-        return ""
-    if "://" not in proxy:
-        return "socks5h://" + proxy
-    return proxy
+    network.add_network_arguments(parser)
+    return parser
 
 
 def normalize_url(url):
@@ -129,8 +125,11 @@ def ensure_directory_url(url):
     return urllib.parse.urlunparse(parsed._replace(path=parsed.path + "/"))
 
 
-def create_session(proxy):
-    session = requests.Session()
+def build_session(parser, args):
+    # The session is built by tcv.network so the crawler shares the field tools'
+    # Tor discipline: remote-DNS SOCKS by default, trust_env off, and no silent
+    # direct connection. Only the request headers are crawler-local.
+    session = network.session_from_args(parser, args)
     session.headers.update(
         {
             "User-Agent": TOR_BROWSER_USER_AGENTS[0],
@@ -141,8 +140,6 @@ def create_session(proxy):
             "DNT": "1",
         }
     )
-    if proxy:
-        session.proxies.update({"http": proxy, "https": proxy})
     return session
 
 
@@ -367,10 +364,9 @@ def print_file(entry):
     print("[+] File: {0}".format(detail))
 
 
-def crawl(args):
+def crawl(args, session):
     start_url = ensure_directory_url(normalize_url(args.url))
-    proxy = normalize_proxy(args.proxy)
-    session = create_session(proxy)
+    proxy = session.proxies.get("https", "")
     include_regex = compile_optional_regex(args.include_regex, "--include-regex")
     exclude_regex = compile_optional_regex(args.exclude_regex, "--exclude-regex")
 
@@ -470,8 +466,10 @@ def write_json(path, data):
 
 
 def main():
-    args = parse_args()
-    result = crawl(args)
+    parser = build_parser()
+    args = parser.parse_args()
+    session = build_session(parser, args)
+    result = crawl(args, session)
     write_json(args.output, result)
     print("[*] JSON written: {0}".format(args.output))
     print("[*] Pages indexed: {0}".format(result["pages_indexed"]))

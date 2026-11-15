@@ -10,16 +10,25 @@ JSON responses, and emits reviewable curl commands for authorized follow-up.
 
 import argparse
 import json
+import os
 import re
+import sys
 import time
 import urllib.parse
 
 import requests
 
+# Allow running as a loose script (python crawlers/api_crawler.py) as well as a
+# module (python -m crawlers.api_crawler): put the repository root on the path
+# so the shared, hardened tcv.network import resolves either way.
+if __package__ in (None, ""):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from tcv import network
+
 
 REPOSITORY = "the-crawling-void"
 TOOL_NAME = "api-crawler"
-DEFAULT_PROXY = "socks5h://localhost:9050"
 REQUEST_TIMEOUT = 60
 TOKEN_ENV_VAR = "TCV_JWT_TOKEN"
 
@@ -78,7 +87,7 @@ class SafeFormatDict(dict):
         return "{" + key + "}"
 
 
-def parse_args():
+def build_parser():
     parser = argparse.ArgumentParser(
         prog=TOOL_NAME,
         description="JWT-aware REST and GraphQL crawler for JSON leak-site listings.",
@@ -92,12 +101,6 @@ def parse_args():
         help="Pattern file. One term, glob, or regex per line.",
     )
     parser.add_argument("-o", "--output", required=True, help="JSON output file.")
-    parser.add_argument(
-        "-p",
-        "--proxy",
-        default=DEFAULT_PROXY,
-        help=f"Proxy URL or host:port. Default: {DEFAULT_PROXY}",
-    )
     parser.add_argument(
         "-d",
         "--delay",
@@ -208,15 +211,8 @@ def parse_args():
         default=0,
         help="Maximum API requests. 0 means unlimited. Default: 0",
     )
-    return parser.parse_args()
-
-
-def normalize_proxy(proxy):
-    if not proxy:
-        return ""
-    if "://" not in proxy:
-        return "socks5h://" + proxy
-    return proxy
+    network.add_network_arguments(parser)
+    return parser
 
 
 def parse_csv(value):
@@ -301,8 +297,11 @@ def base_url_for(url):
     return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, "/", "", "", "")).rstrip("/")
 
 
-def create_session(token, proxy, auth_mode):
-    session = requests.Session()
+def build_session(parser, args):
+    # The session is built by tcv.network so the crawler shares the field tools'
+    # Tor discipline: remote-DNS SOCKS by default, trust_env off, and no silent
+    # direct connection. Only the headers and optional JWT auth are crawler-local.
+    session = network.session_from_args(parser, args)
     session.headers.update(
         {
             "User-Agent": TOR_BROWSER_USER_AGENTS[0],
@@ -315,12 +314,9 @@ def create_session(token, proxy, auth_mode):
         }
     )
 
-    if token and auth_mode in ("header", "both"):
-        session.headers["Authorization"] = "Bearer " + token
-        session.headers["Cookie"] = "token={0}; jwt={0}; session={0}".format(token)
-
-    if proxy:
-        session.proxies.update({"http": proxy, "https": proxy})
+    if args.token and args.auth_mode in ("header", "both"):
+        session.headers["Authorization"] = "Bearer " + args.token
+        session.headers["Cookie"] = "token={0}; jwt={0}; session={0}".format(args.token)
 
     return session
 
@@ -828,12 +824,11 @@ def prepare_graphql(args):
     return query, variables
 
 
-def crawl(args):
+def crawl(args, session):
     endpoint_url = normalized_endpoint(args.url, args.token_param)
-    proxy = normalize_proxy(args.proxy)
+    proxy = session.proxies.get("https", "")
     pattern_lines = load_pattern_lines(args.wordlist)
     patterns = compile_patterns(pattern_lines, args.pattern_mode)
-    session = create_session(args.token, proxy, args.auth_mode)
     options = build_options(args)
     graphql_query, graphql_variables = prepare_graphql(args)
 
@@ -916,8 +911,10 @@ def write_json(path, data):
 
 
 def main():
-    args = parse_args()
-    result = crawl(args)
+    parser = build_parser()
+    args = parser.parse_args()
+    session = build_session(parser, args)
+    result = crawl(args, session)
     write_json(args.output, result)
     print("[*] JSON written: {0}".format(args.output))
     print("[*] Requests made: {0}".format(result["requests_made"]))

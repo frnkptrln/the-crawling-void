@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 
 import pytest
 
@@ -8,7 +9,7 @@ from tcv.network import DEFAULT_PROXY, ProxyConfigError, normalize_proxy, sessio
 
 def run_tool(*args):
     return subprocess.run(
-        ["python", *args],
+        [sys.executable, *args],
         capture_output=True,
         text=True,
         env={**os.environ, "PYTHONPATH": "."},
